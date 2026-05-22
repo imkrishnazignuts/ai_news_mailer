@@ -12,10 +12,10 @@
       "dest": "api/index.py"
     }
   ],
-  "crons": [
+ "crons": [
   {
     "path": "/send-mail",
-    "schedule": "40 14 * * *"
+    "schedule": "20 9 * * *"
   }
 ]
 }
