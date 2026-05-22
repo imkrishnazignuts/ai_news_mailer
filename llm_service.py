@@ -271,6 +271,7 @@ def send_newsletter_email(to_emails:list[str],subject:str,html_content:str):
 
 @router.get("")
 def send_mail():
+    print("CRON HIT /send-mail")
     db:Session=Session_local()
     try:
       news = get_new_articles(db)
