@@ -157,6 +157,78 @@ If a news item is not important enough for busy engineers to spend time reading,
 
 chain = prompt | llm | JsonOutputParser()
 
+MAX_ARTICLES_FOR_LLM = 25
+MAX_SUMMARY_CHARS = 700
+MAX_NEWS_INPUT_CHARS = 18000
+
+PREFERRED_SOURCES = {"OpenAI", "LangChain", "Hugging Face", "arXiv AI", "arXiv ML", "arXiv NLP"}
+DEVELOPER_KEYWORDS = {
+    "agent",
+    "ai",
+    "api",
+    "arxiv",
+    "benchmark",
+    "cloud",
+    "code",
+    "coding",
+    "developer",
+    "embedding",
+    "fine-tuning",
+    "framework",
+    "gpu",
+    "inference",
+    "langchain",
+    "llm",
+    "model",
+    "open source",
+    "openai",
+    "rag",
+    "sdk",
+    "security",
+    "tool",
+    "vector",
+}
+
+def _clip_text(value, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+def _article_score(article: dict) -> int:
+    source = article.get("source", "")
+    text = f"{article.get('title', '')} {article.get('summary', '')} {source}".lower()
+    score = 3 if source in PREFERRED_SOURCES else 0
+    return score + sum(1 for keyword in DEVELOPER_KEYWORDS if keyword in text)
+
+def prepare_news_for_llm(articles: list[dict]) -> str:
+    ranked_articles = sorted(articles, key=_article_score, reverse=True)
+    compact_articles = []
+
+    for article in ranked_articles[:MAX_ARTICLES_FOR_LLM]:
+        compact_articles.append({
+            "title": _clip_text(article.get("title"), 220),
+            "source": article.get("source"),
+            "url": article.get("url"),
+            "published_at": article.get("published_at"),
+            "summary": _clip_text(article.get("summary"), MAX_SUMMARY_CHARS),
+        })
+
+    news_json = json.dumps(compact_articles, default=str, ensure_ascii=False)
+    if len(news_json) <= MAX_NEWS_INPUT_CHARS:
+        return news_json
+
+    trimmed_articles = []
+    total_chars = 2
+    for article in compact_articles:
+        article_json = json.dumps(article, default=str, ensure_ascii=False)
+        if total_chars + len(article_json) + 1 > MAX_NEWS_INPUT_CHARS:
+            break
+        trimmed_articles.append(article)
+        total_chars += len(article_json) + 1
+
+    return json.dumps(trimmed_articles, default=str, ensure_ascii=False)
+
 def build_newsletter_html(data: dict) -> str:
     highlights_html = ""
 
@@ -254,33 +326,35 @@ def send_newsletter_email(to_emails:list[str],subject:str,html_content:str):
             msg.as_string()
         )
 
-# @router.get("")
-# def send_mail():
-#     db:Session=Session_local()
-#     try:
-#       news = get_new_articles(db)
-#       data = chain.invoke({"news":news})
-
-#       html_content = build_newsletter_html(data)
-#       send_newsletter_email(["krishnaz@zignuts.com","jeetm@zignuts.com","anshg@zignuts.com","devp@zignuts.com","abhinava@zignuts.com"],"Latest Ai News",html_content=html_content)
-#       return {
-#           "message":"email sended succesfully"
-#       }
-#     finally:
-#         db.close()
-
 @router.get("")
 def send_mail():
-    print("CRON HIT /send-mail")
     db:Session=Session_local()
     try:
       news = get_new_articles(db)
       data = chain.invoke({"news":news})
 
       html_content = build_newsletter_html(data)
-      send_newsletter_email(["krishnaz@zignuts.com"],"Latest Ai News",html_content=html_content)
+      send_newsletter_email(["krishnaz@zignuts.com","anshg@zignuts.com","devp@zignuts.com","abhinava@zignuts.com"],"Latest Ai News",html_content=html_content)
       return {
           "message":"email sended succesfully"
       }
     finally:
         db.close()
+
+# @router.get("")
+# def send_mail():
+#     print("CRON HIT /send-mail")
+#     db:Session=Session_local()
+#     try:
+#       news = get_new_articles(db)
+#       news_input = prepare_news_for_llm(news)
+#       print(f"LLM news input: {len(news)} articles fetched, {len(news_input)} chars sent")
+#       data = chain.invoke({"news": news_input})
+
+#       html_content = build_newsletter_html(data)
+#       send_newsletter_email(["krishnaz@zignuts.com"],"Latest Ai News",html_content=html_content)
+#       return {
+#           "message":"email sended succesfully"
+#       }
+#     finally:
+#         db.close()

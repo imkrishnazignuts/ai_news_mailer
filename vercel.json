@@ -13,9 +13,9 @@
     }
   ],
 "crons": [
-    {
-      "path": "/send-mail",
-      "schedule": "55 9 * * *"
-    }
-  ]
+  {
+    "path": "/send-mail",
+    "schedule": "25 4 * * *"
+  }
+]
 }

@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -16,7 +17,16 @@ if URL.startswith("postgres://"):
     URL = URL.replace("postgres://", "postgresql://", 1)
 
 connect_args = {}
-if "sslmode=" not in URL:
+parsed_url = make_url(URL)
+db_sslmode = os.getenv("DB_SSLMODE")
+
+if db_sslmode:
+    connect_args["sslmode"] = db_sslmode
+elif "sslmode" not in parsed_url.query and parsed_url.host not in {
+    "localhost",
+    "127.0.0.1",
+    "::1",
+}:
     connect_args["sslmode"] = "require"
 
 engine = create_engine(
